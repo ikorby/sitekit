@@ -19,7 +19,7 @@ func Robots(cfg *config.Config, rules ...RobotsRule) http.Handler {
 		var b strings.Builder
 
 		if cfg.IsDevelopment() {
-			b.WriteString("User-agent: *\nDisallow: /\n")
+			_, _ = b.WriteString("User-agent: *\nDisallow: /\n")
 		} else {
 			if len(rules) == 0 {
 				rules = []RobotsRule{{UserAgent: "*"}}
@@ -29,17 +29,17 @@ func Robots(cfg *config.Config, rules ...RobotsRule) http.Handler {
 				if ua == "" {
 					ua = "*"
 				}
-				fmt.Fprintf(&b, "User-agent: %s\n", ua)
+				_, _ = fmt.Fprintf(&b, "User-agent: %s\n", ua)
 				for _, d := range rule.Disallow {
-					fmt.Fprintf(&b, "Disallow: %s\n", d)
+					_, _ = fmt.Fprintf(&b, "Disallow: %s\n", d)
 				}
 				for _, a := range rule.Allow {
-					fmt.Fprintf(&b, "Allow: %s\n", a)
+					_, _ = fmt.Fprintf(&b, "Allow: %s\n", a)
 				}
-				b.WriteString("\n")
+				_, _ = b.WriteString("\n")
 			}
 			if base := strings.TrimRight(cfg.BaseURL, "/"); base != "" {
-				fmt.Fprintf(&b, "Sitemap: %s/sitemap.xml\n", base)
+				_, _ = fmt.Fprintf(&b, "Sitemap: %s/sitemap.xml\n", base)
 			}
 		}
 
