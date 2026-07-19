@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ikorby/sitekit/config"
+	"github.com/ikorby/sitekit/livereload"
 	"github.com/ikorby/sitekit/render"
 )
 
@@ -56,6 +57,16 @@ func New(cfg *config.Config, opts ...Option) *App {
 
 	for _, opt := range opts {
 		opt(a)
+	}
+
+	if cfg.IsDevelopment() {
+		reloadCh := livereload.StartWatcher(cfg.TemplatesDir, 500*time.Millisecond)
+
+		a.Mux.Handle("GET /__sitekit/livereload", livereload.SSEHandler(reloadCh))
+
+		a.middlewares = append(a.middlewares, livereload.Middleware(cfg))
+
+		a.Logger.Info("sitekit: live reload enabled", "dir", cfg.TemplatesDir)
 	}
 
 	return a
