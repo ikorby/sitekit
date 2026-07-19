@@ -58,26 +58,17 @@ Your site will be running at `http://localhost:8080`.
 Sitekit uses generics to ensure type safety between your Go handlers and HTML templates:
 
 ```go
-package main
-
-import (
-	"net/http"
-	"github.com/ikorby/sitekit/app"
-	"github.com/ikorby/sitekit/page"
-)
-
 // 1. Define your data structure
 type HomePageData struct {
-	WelcomeMessage string
+    WelcomeMessage string
 }
 
 // 2. Pass it to the page securely
-// (Assuming 'r' is your router instance)
 r.Get("/", func(c *app.Context) error {
-	p := page.New("home.html", HomePageData{
-		WelcomeMessage: "Hello, World!",
-	})
-	return c.Render(http.StatusOK, p)
+    p := page.New("home.html", HomePageData{
+        WelcomeMessage: "Hello, World!",
+    })
+    return c.Render(http.StatusOK, p)
 })
 ```
 
