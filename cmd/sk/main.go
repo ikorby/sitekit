@@ -17,7 +17,6 @@ func main() {
 	}
 }
 
-// Вынесли логику сюда. baseDir нужен, чтобы в тестах генерировать проект во временной папке.
 func run(args []string, baseDir string) error {
 	if len(args) < 3 || args[1] != "new" {
 		return fmt.Errorf("usage: sk new <project-name>")
@@ -53,12 +52,29 @@ func run(args []string, baseDir string) error {
 		}
 	}
 
-	cmd := exec.Command("go", "mod", "init", projectName)
-	cmd.Dir = targetDir
-	if err := cmd.Run(); err != nil {
+	// 1. Инициализируем go.mod
+	cmdInit := exec.Command("go", "mod", "init", projectName)
+	cmdInit.Dir = targetDir
+	if err := cmdInit.Run(); err != nil {
 		return fmt.Errorf("failed to init go module: %w", err)
 	}
 
+	// 2. Скачиваем сам фреймворк
+	cmdGet := exec.Command("go", "get", "github.com/ikorby/sitekit@latest")
+	cmdGet.Dir = targetDir
+	if err := cmdGet.Run(); err != nil {
+		return fmt.Errorf("failed to get sitekit dependency: %w", err)
+	}
+
+	// 3. Подчищаем зависимости
+	cmdTidy := exec.Command("go", "mod", "tidy")
+	cmdTidy.Dir = targetDir
+	if err := cmdTidy.Run(); err != nil {
+		return fmt.Errorf("failed to run go mod tidy: %w", err)
+	}
+
+	fmt.Printf("✅ Sitekit project '%s' successfully created!\n", projectName)
+	fmt.Printf("cd %s && go run ./cmd/newsite\n", projectName)
 	return nil
 }
 
@@ -72,6 +88,8 @@ import (
 
 	"github.com/ikorby/sitekit/app"
 	"github.com/ikorby/sitekit/config"
+	apperrors "github.com/ikorby/sitekit/errors"
+	"github.com/ikorby/sitekit/middleware"
 	"github.com/ikorby/sitekit/page"
 	"github.com/ikorby/sitekit/render"
 	"github.com/ikorby/sitekit/router"
@@ -84,8 +102,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	logger := slog.Default()
 	renderer := render.New(os.DirFS("templates"), cfg.IsDevelopment())
-	application := app.New(cfg, app.WithRenderer(renderer))
+	
+	// Теперь мы подключаем логгер, обработчик ошибок и все middleware фреймворка
+	application := app.New(cfg, 
+		app.WithRenderer(renderer),
+		app.WithLogger(logger),
+		app.WithErrorHandler(apperrors.Handler(logger)),
+		app.WithMiddleware(
+			middleware.Recovery(logger),
+			middleware.Logger(logger),
+			middleware.Security(cfg),
+		),
+	)
 	
 	r := router.New(application)
 	r.Get("/", func(c *app.Context) error {
@@ -101,20 +131,20 @@ func main() {
 }
 
 func baseHTMLTemplate() string {
-	return `<!DOCTYPE html>
+	return `{{define "layout"}}<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>{{.Meta.Title}}</title>
 </head>
 <body>
-    {{template "layout" .}}
+    {{template "content" .}}
 </body>
-</html>`
+</html>{{end}}`
 }
 
 func homeHTMLTemplate() string {
-	return `{{define "layout"}}
+	return `{{define "content"}}
     <h1>{{.Data.Title}}</h1>
     <p>Your site is ready.</p>
 {{end}}`
