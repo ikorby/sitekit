@@ -167,8 +167,8 @@ func TestNotFoundCatchAll(t *testing.T) {
 
 	r.Get("/", func(c *app.Context) error { return c.JSON(http.StatusOK, "root") })
 	r.NotFound(func(c *app.Context) error {
-		c.W.WriteHeader(http.StatusNotFound)
-		_, _ = c.W.Write([]byte("custom-404"))
+		c.Writer.WriteHeader(http.StatusNotFound)
+		_, _ = c.Writer.Write([]byte("custom-404"))
 		return nil
 	})
 
@@ -190,14 +190,14 @@ func TestNestedGroupNotFound(t *testing.T) {
 	admin := r.Group("/admin")
 	admin.Get("/dashboard", func(c *app.Context) error { return c.JSON(http.StatusOK, "dashboard") })
 	admin.NotFound(func(c *app.Context) error {
-		c.W.WriteHeader(http.StatusNotFound)
-		_, _ = c.W.Write([]byte("admin-404"))
+		c.Writer.WriteHeader(http.StatusNotFound)
+		_, _ = c.Writer.Write([]byte("admin-404"))
 		return nil
 	})
 
 	r.NotFound(func(c *app.Context) error {
-		c.W.WriteHeader(http.StatusNotFound)
-		_, _ = c.W.Write([]byte("global-404"))
+		c.Writer.WriteHeader(http.StatusNotFound)
+		_, _ = c.Writer.Write([]byte("global-404"))
 		return nil
 	})
 

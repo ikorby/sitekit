@@ -26,8 +26,8 @@ func Handler(logger *slog.Logger) app.ErrorHandler {
 		logger.Error("sitekit: request error",
 			"error", err,
 			"status", status,
-			"method", c.R.Method,
-			"path", c.R.URL.Path,
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
 		)
 
 		title := http.StatusText(status)

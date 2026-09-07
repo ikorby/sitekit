@@ -75,13 +75,13 @@ func buildApp(t *testing.T) *app.App {
 	})
 
 	r.Get("/robots.txt", func(c *app.Context) error {
-		seo.Robots(cfg).ServeHTTP(c.W, c.R)
+		seo.Robots(cfg).ServeHTTP(c.Writer, c.Request)
 		return nil
 	})
 
 	sitemapURLs := []seo.SitemapURL{{Loc: "/", ChangeFreq: "daily", Priority: 0.9}}
 	r.Get("/sitemap.xml", func(c *app.Context) error {
-		seo.Sitemap(cfg.BaseURL, sitemapURLs).ServeHTTP(c.W, c.R)
+		seo.Sitemap(cfg.BaseURL, sitemapURLs).ServeHTTP(c.Writer, c.Request)
 		return nil
 	})
 

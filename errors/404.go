@@ -56,9 +56,9 @@ func renderErrorPage(c *app.Context, status int, title, message string) error {
 		return nil
 	}
 
-	c.W.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.W.WriteHeader(status)
-	_, _ = c.W.Write([]byte(title + "\n\n" + message))
+	c.Writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	c.Writer.WriteHeader(status)
+	_, _ = c.Writer.Write([]byte(title + "\n\n" + message))
 	return nil
 }
 

@@ -21,10 +21,10 @@ func Wrap(h HandlerFunc, mws ...HandlerMiddleware) HandlerFunc {
 var errNoRenderer = errors.New("app: renderer is not configured")
 
 func defaultErrorHandler(c *Context, err error) {
-	if c.W.Header().Get("Content-Type") != "" {
+	if c.Writer.Header().Get("Content-Type") != "" {
 		return
 	}
-	http.Error(c.W, "Internal Server Error", http.StatusInternalServerError)
+	http.Error(c.Writer, "Internal Server Error", http.StatusInternalServerError)
 }
 
 func (a *App) newRequestContext(w http.ResponseWriter, r *http.Request) *Context {
