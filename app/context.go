@@ -10,13 +10,13 @@ import (
 )
 
 type Context struct {
-	Writer  http.ResponseWriter
+	Writer  *Response
 	Request *http.Request
 
 	renderer *render.Renderer
 }
 
-func newContext(w http.ResponseWriter, r *http.Request, renderer *render.Renderer) *Context {
+func newContext(w *Response, r *http.Request, renderer *render.Renderer) *Context {
 	return &Context{Writer: w, Request: r, renderer: renderer}
 }
 
