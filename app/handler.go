@@ -28,7 +28,7 @@ func defaultErrorHandler(c *Context, err error) {
 }
 
 func (a *App) newRequestContext(w http.ResponseWriter, r *http.Request) *Context {
-	return newContext(w, r, a.Renderer)
+	return newContext(NewResponse(w), r, a.Renderer)
 }
 
 func (a *App) handleError(c *Context, err error) {
