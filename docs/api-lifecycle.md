@@ -1,135 +1,187 @@
 # API Lifecycle
 
-This document is the registry for Sitekit's public API lifecycle.
+This document defines the lifecycle and compatibility commitment of Sitekit's public API.
 
-It answers a different question from `contracts.md`:
+It answers two questions:
 
-> **How permanent is this API, and how may Sitekit change it?**
+- How important is this API to the framework's architecture?
+- How much does Sitekit commit to preserving it?
 
-`contracts.md` defines what an API promises to do. This document defines how strongly Sitekit commits to preserving that API over time.
+`contracts.md` defines API behavior. `api-lifecycle.md` defines how APIs may evolve.
 
-## Lifecycle levels
+## Lifecycle Levels
 
 ### Stable
 
 The API is part of Sitekit's long-term public surface.
 
-Stable APIs must preserve their documented source and behavioral contracts. Breaking changes require an explicit compatibility policy and are not introduced as ordinary maintenance.
-
-Stable does **not** mean that the implementation can never change. It means that observable behavior and the public API are protected while the implementation remains free to evolve behind them.
+Its documented source and behavioral contracts must be preserved. Breaking changes require an explicit compatibility policy.
 
 ### Provisional
 
-The API is public and usable, but its contract is not yet considered final.
+The API is public and usable, but its contract is not final.
 
-Provisional APIs may be changed before the first stable release when experience, testing, or architectural review shows that a different design is better. Changes should be documented when they affect users.
+It may change before the first stable release. Changes affecting users must be documented.
 
 ### Experimental
 
-The API exists primarily to validate an idea or provide functionality whose final shape is intentionally undecided.
-
-Experimental APIs may change substantially or disappear without preserving source compatibility. They should not be treated as foundations for long-lived application code.
+The API is intended for experimentation. It may change substantially or be removed without preserving compatibility.
 
 ### Deprecated
 
-The API remains available for compatibility but is no longer the preferred direction.
+The API remains available temporarily but is no longer recommended.
 
-Deprecated APIs should have a documented replacement or an explicit reason for removal. New code should not depend on them.
+Deprecation must include a reason, migration guidance, and a replacement when available.
 
 ### Internal
 
-The implementation detail is not part of Sitekit's public API contract.
+The implementation detail is not part of the public API contract and may change freely.
 
-Internal code may change freely as long as the documented public contracts remain valid.
+## API Roles
+
+Architectural role and lifecycle status are independent classifications.
+
+### Core
+
+Defines Sitekit's fundamental programming model.
+
+Examples: application handling, routing, pages, and rendering.
+
+### Supporting
+
+Provides additional functionality around the core without defining its fundamental programming model.
+
+Examples: configuration, SEO, static files, and convenience middleware.
+
+### Tooling
+
+Supports development workflows rather than application runtime behavior.
+
+Examples: CLI, project generators, and live reload.
+
+A Core API may remain Provisional. A Supporting API may become Stable. Tooling may evolve independently of runtime APIs.
+
+## Pre-stable API Evolution
+
+Before `v1.0.0`, Provisional APIs may undergo source-level, behavioral, and structural changes.
+
+Experimental APIs may change or be removed without prior deprecation.
+
+Changes affecting application code or observable behavior must be documented.
+
+### v0.2.0 milestone
+
+Version `v0.2.0` is a foundational architecture and contract milestone.
+
+It covers:
+
+- Response commitment and response helpers;
+- Atomic rendering and JSON responses;
+- Error handling after response commitment;
+- Application lifecycle;
+- Concurrency guarantees;
+- Public API boundaries and mutable state;
+- Middleware semantics;
+- Router semantics.
+
+Reaching `v0.2.0` does not automatically make any API Stable.
 
 ## Registry
 
-The registry below describes the intended lifecycle of the current public surface. A lifecycle label is an explicit project decision; it is not inferred merely from the fact that a Go identifier is exported.
+The registry identifies the architectural role and intended lifecycle of individual public API symbols.
 
-| Area | API | Lifecycle | Intended direction |
-|---|---|---|---|
-| `app` | `App` | Provisional | Core application object; likely long-term API, but exported fields and lifecycle semantics need tightening before stabilization. |
-| `app` | `New` | Provisional | Primary application constructor. |
-| `app` | `Option` | Provisional | Constructor configuration mechanism. |
-| `app` | `WithRenderer` | Provisional | Renderer injection/configuration. |
-| `app` | `WithLogger` | Provisional | Logger injection/configuration. |
-| `app` | `WithErrorHandler` | Provisional | Application error-boundary configuration. |
-| `app` | `WithMiddleware` | Provisional | HTTP middleware configuration. |
-| `app` | `Middleware` | Provisional | Standard `net/http` middleware shape; intended to become stable. |
-| `app` | `HandlerFunc` | Provisional | Primary Sitekit handler abstraction; intended to become stable. |
-| `app` | `HandlerMiddleware` | Provisional | Handler-level middleware abstraction; intended to become stable. |
-| `app` | `ErrorHandler` | Provisional | Explicit application error boundary; intended to become stable after response semantics are finalized. |
-| `app` | `Wrap` | Provisional | Handler middleware composition primitive. |
-| `app` | `ToHandler` | Provisional | Escape hatch from Sitekit handlers to `http.HandlerFunc`. |
-| `app` | `Context` | Provisional | Request-scoped Sitekit convenience layer over `net/http`. |
-| `app` | `Context.Writer` / `Context.Request` | Provisional | Direct stdlib escape hatches; intended to remain available. |
-| `app` | `Context.Context` | Provisional | Access to the underlying request context. |
-| `app` | `WithValue` / `Context.Value` | Provisional | Request-scoped application values; semantics require further contract definition. |
-| `app` | `Context.Param` / `Context.Query` | Provisional | Request convenience accessors built on stdlib request data. |
-| `app` | `Context.Render` / `Context.JSON` / `Context.Redirect` | Provisional | Response helpers; behavior must be aligned with the final Response Contract. |
-| `router` | `Router` | Provisional | Thin routing layer over `http.ServeMux`; intended long-term. |
-| `router` | `New` | Provisional | Router constructor. |
-| `router` | `Group` / `Use` | Provisional | Route composition and middleware inheritance. |
-| `router` | `Handle` / `Get` / `Post` / `Put` / `Patch` / `Delete` / `Head` / `Options` / `Any` / `NotFound` | Provisional | Main route registration surface; semantics should remain based on `http.ServeMux`. |
-| `router` | `Static` | Provisional | Static-handler mounting convenience; exact contract still needs review. |
-| `page` | `Meta` | Provisional | Page metadata model; intended long-term but still subject to SEO/API review. |
-| `page` | `Page` | Provisional | Core renderer input contract; intended long-term. |
-| `page` | `TypedPage[T]` | Provisional | Generic typed page implementation; intended long-term. |
-| `page` | `New` / `WithLayout` / `WithMeta` | Provisional | Typed page construction helpers. |
-| `render` | `Renderer` | Provisional | SSR renderer; core abstraction but rendering/response semantics are not yet final. |
-| `render` | `New` | Provisional | Renderer constructor. |
-| `render` | `Funcs` | Provisional | Template function registration; exact lifecycle and mutation semantics need review. |
-| `render` | `Render` | Provisional | Rendering entrypoint; must satisfy the final Response and Rendering Contracts. |
-| `config` | `Env` / `Development` / `Production` | Provisional | Environment model; intended long-term. |
-| `config` | `Config` | Provisional | Runtime configuration model; field-level compatibility needs explicit policy. |
-| `config` | `Load` | Provisional | Environment-based configuration loading. |
-| `config` | `IsDevelopment` / `IsProduction` / `Addr` | Provisional | Configuration helpers. |
-| `errors` | `HTTPError` | Provisional | Structured HTTP error; intended long-term after error semantics are finalized. |
-| `errors` | `New` / `Wrap` / `NotFoundError` | Provisional | HTTP error constructors. |
-| `errors` | `NotFound` | Provisional | Error-page handler convenience; exact fallback behavior needs contract review. |
-| `seo` | Public SEO helpers and types | Provisional | Useful application-level tooling; exact API surface requires contract review before stabilization. |
-| `static` | Public static-file helpers | Provisional | Application-level convenience; exact API surface requires contract review before stabilization. |
-| `middleware` | Public middleware helpers | Provisional | Convenience middleware; each API must be reviewed individually before stabilization. |
-| `livereload` | Public development helpers | Experimental | Development tooling; implementation and API shape may change substantially. |
-| `cmd/sk` | CLI commands and generated project shape | Experimental | Tooling is intentionally allowed to evolve quickly before the framework reaches a stable release. |
+Each entry represents an explicit project decision. Exported Go identifiers are not automatically considered stable public contracts.
 
-## Current commitment level
+Package-level documentation remains the source for detailed API descriptions. This registry defines how strongly Sitekit commits to preserving each listed API.
 
-At the current pre-v1 stage, **no runtime API is declared Stable yet**.
+| Area | API | Role | Lifecycle | Intended Direction |
+|---|---|---|---|---|
+| `app` | `App` | Core | Provisional | Application runtime and composition root. |
+| `app` | `New` | Core | Provisional | Primary application constructor. |
+| `app` | `Option` | Core | Provisional | Application constructor configuration. |
+| `app` | `App.Config` | Core | Provisional | Application configuration access. |
+| `app` | `App.Renderer` | Core | Provisional | Renderer access and configuration. |
+| `app` | `App.Mux` | Core | Provisional | Underlying standard-library router access. |
+| `app` | `App.Logger` | Core | Provisional | Application logger access. |
+| `app` | `App.ErrorHandler` | Core | Provisional | Application error-boundary configuration. |
+| `app` | `WithRenderer` | Core | Provisional | Renderer injection. |
+| `app` | `WithLogger` | Core | Provisional | Logger injection. |
+| `app` | `WithErrorHandler` | Core | Provisional | Error-handler injection. |
+| `app` | `WithMiddleware` | Core | Provisional | Application HTTP middleware registration. |
+| `app` | `Middleware` | Core | Provisional | Standard HTTP middleware abstraction. |
+| `app` | `HandlerFunc` | Core | Provisional | Primary Sitekit handler abstraction. |
+| `app` | `HandlerMiddleware` | Core | Provisional | Handler-level middleware abstraction. |
+| `app` | `ErrorHandler` | Core | Provisional | Explicit application error boundary. |
+| `app` | `Wrap` | Core | Provisional | Handler middleware composition. |
+| `app` | `ToHandler` | Core | Provisional | Conversion to standard HTTP handler. |
+| `app` | `Context` | Core | Provisional | Request-scoped application context. |
+| `app` | `Context.Writer` | Core | Provisional | Sitekit response boundary. |
+| `app` | `Context.Request` | Core | Provisional | Underlying HTTP request access. |
+| `app` | `Context.Context` | Core | Provisional | Underlying request context access. |
+| `app` | `WithValue` / `Context.Value` | Core | Provisional | Request-scoped value storage and retrieval. |
+| `app` | `Context.Param` / `Context.Query` | Core | Provisional | Request parameter and query accessors. |
+| `app` | `Context.Render` / `Context.JSON` / `Context.Redirect` | Core | Provisional | Response helpers. |
+| `app` | `Response` | Core | Provisional | HTTP response boundary and state tracking. |
+| `app` | `NewResponse` | Core | Provisional | Response boundary constructor. |
+| `app` | `Response.Header` | Core | Provisional | Response header access. |
+| `app` | `Response.WriteHeader` | Core | Provisional | Response status commitment. |
+| `app` | `Response.Write` | Core | Provisional | Response body writing and byte tracking. |
+| `app` | `Response.Status` | Core | Provisional | Response status inspection. |
+| `app` | `Response.BytesWritten` | Core | Provisional | Response byte-count inspection. |
+| `app` | `Response.Committed` | Core | Provisional | Response commitment inspection. |
+| `app` | `Response.Unwrap` | Core | Provisional | Escape hatch to the underlying HTTP response writer. |
+| `router` | `Router` | Core | Provisional | Routing adapter over `http.ServeMux`. |
+| `router` | `New` | Core | Provisional | Router constructor. |
+| `router` | `Group` / `Use` | Core | Provisional | Route grouping and middleware composition. |
+| `router` | `Handle` / `Get` / `Post` / `Put` / `Patch` / `Delete` / `Head` / `Options` / `Any` / `NotFound` | Core | Provisional | Route registration API. |
+| `router` | `Static` | Core | Provisional | Static handler mounting. |
+| `page` | `Meta` | Core | Provisional | Page metadata model. |
+| `page` | `Page` | Core | Provisional | Renderer input contract. |
+| `page` | `TypedPage[T]` | Core | Provisional | Generic typed page implementation. |
+| `page` | `New` / `WithLayout` / `WithMeta` | Core | Provisional | Typed page construction and configuration. |
+| `render` | `Renderer` | Core | Provisional | Server-side rendering abstraction. |
+| `render` | `New` | Core | Provisional | Renderer constructor. |
+| `render` | `Funcs` | Core | Provisional | Template function registration. |
+| `render` | `Render` | Core | Provisional | HTML rendering entry point. |
+| `config` | `Env` / `Development` / `Production` | Supporting | Provisional | Environment model. |
+| `config` | `Config` | Supporting | Provisional | Runtime configuration model. |
+| `config` | `Load` | Supporting | Provisional | Environment-based configuration loading. |
+| `config` | `IsDevelopment` / `IsProduction` / `Addr` | Supporting | Provisional | Configuration helpers. |
+| `errors` | `HTTPError` | Supporting | Provisional | Structured HTTP error representation. |
+| `errors` | `New` / `Wrap` / `NotFoundError` | Supporting | Provisional | HTTP error constructors. |
+| `errors` | `NotFound` / `Handler` | Supporting | Provisional | HTTP error and error-page handlers. |
+| `seo` | `Defaults` / `DefaultsFromConfig` / `Apply` / `CanonicalURL` | Supporting | Provisional | SEO metadata helpers. |
+| `static` | `New` | Supporting | Provisional | Standard-library static file handler construction. |
+| `middleware` | `Logger` / `Recovery` / `Security` | Supporting | Provisional | Convenience HTTP middleware. |
+| `livereload` | `StartWatcher` / `SSEHandler` / `Middleware` | Tooling | Experimental | Development-only live reload functionality. |
+| `cmd/sk` | CLI commands and generated project structure | Tooling | Experimental | Project creation and development tooling. |
 
-This is deliberate. The architecture is being documented before the public surface is frozen, and the response, error, rendering, concurrency, and lifecycle contracts still need to be made explicit.
+The registry describes intentional project decisions. Exported Go identifiers are not automatically considered stable public contracts.
 
-The intended progression is:
+Package-level documentation remains the source for identifying individual exported APIs.
 
-```text
-Experimental
-     ↓
-Provisional
-     ↓
-Stable
-```
+## Promotion and Removal
 
-An API should move to Stable only when:
+An API may become Stable only when:
 
-1. its purpose is understood and consistent with the architecture;
-2. its behavior is explicitly defined in `contracts.md`;
-3. its compatibility expectations are documented in `compatibility.md`;
-4. its implementation satisfies the contract;
-5. its tests protect the important observable behavior.
+1. Its architectural purpose is established;
+2. Its behavior is documented in `contracts.md`;
+3. Its compatibility guarantees are defined in `compatibility.md`;
+4. Its implementation satisfies those guarantees;
+5. Tests protect its observable behavior.
 
-## What lifecycle status does not mean
+Removal rules:
 
-Lifecycle status does not describe implementation quality.
+- Experimental APIs may be removed directly.
+- Provisional APIs may be changed or removed before `v1.0.0`, with documented migration information.
+- Stable APIs must follow the compatibility policy.
+- Deprecated APIs may be removed according to their documented removal conditions.
 
-An Experimental API can be well implemented. A Provisional API can already be heavily tested. A Stable API may still receive internal refactors.
+Lifecycle transitions must be reflected in this registry.
 
-The status answers only this question:
+## Relationship with Other Documents
 
-> **How much should an application depend on the exact public shape and behavior of this API?**
-
-## Relationship with other documents
-
-The intended documentation dependency is:
+The documentation dependency is:
 
 ```text
 Design Principles
@@ -143,39 +195,18 @@ Compatibility
 Roadmap
 ```
 
-`api-lifecycle.md` crosses this chain as the registry of concrete APIs:
+`api-lifecycle.md` crosses this chain by tracking the lifecycle of concrete APIs.
 
-```text
-             API Lifecycle
-            /      |      \
-           ↓       ↓       ↓
-Architecture → Contracts → Compatibility → Roadmap
-```
+A lifecycle change may require reviewing the corresponding architecture, contracts, compatibility rules, and roadmap.
 
-When an API changes lifecycle status, the corresponding contract and compatibility rules must be reviewed as well.
+## Source of Truth
 
-## Rules for lifecycle changes
+Use:
 
-Lifecycle changes should be explicit.
+- `architecture.md` for architectural boundaries and responsibilities;
+- `contracts.md` for observable API guarantees;
+- `compatibility.md` for compatibility policy;
+- `roadmap.md` for planned changes and release milestones;
+- `api-lifecycle.md` for API lifecycle status.
 
-### Promoting an API
-
-Moving an API from Experimental or Provisional to Stable requires a contract review. The project should be able to state exactly what users may rely on.
-
-### Deprecating an API
-
-A deprecated API should not be silently changed into a different abstraction. Deprecation should preserve enough behavior for existing users to migrate deliberately.
-
-### Removing an API
-
-Removal is a compatibility event, not merely a cleanup. The API must first be marked Deprecated unless an explicitly documented pre-stable policy permits direct removal.
-
-## Source of truth
-
-This document is the lifecycle registry, not the API reference.
-
-If a question concerns **what an API does**, use `contracts.md` and the package documentation.
-
-If a question concerns **whether the API may change**, use this document and `compatibility.md`.
-
-If a question concerns **when a planned change will happen**, use `roadmap.md`.
+Lifecycle status does not describe implementation quality. It describes how strongly users may rely on an API remaining compatible.

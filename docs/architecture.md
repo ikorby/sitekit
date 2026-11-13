@@ -1,256 +1,235 @@
 # Architecture
 
-Sitekit is an opinionated server-side rendering framework built on top of Go's `net/http` and standard-library primitives.
+Sitekit is an opinionated server-side rendering framework built on Go's `net/http` and standard-library primitives.
 
-This document describes the architectural model that follows from the design principles in [`design-principles.md`](./design-principles.md). It is concerned with responsibilities, dependency direction, and request flow rather than individual API signatures. Concrete public APIs are tracked separately by the API lifecycle registry.
+This document defines the architectural model, component responsibilities, dependency direction, and system boundaries. It describes the intended architecture rather than individual API signatures or implementation details.
 
-## 1. Architectural position
+The model follows the principles defined in [`design-principles.md`](./design-principles.md).
 
-Sitekit is an application-layer framework, not a replacement for the Go HTTP stack.
+## 1. Architectural Position
 
-The architectural boundary is therefore:
+Sitekit is an application-layer framework, not a replacement for Go's HTTP stack.
+
+Its architecture is built around three layers:
 
 ```text
-application
-    |
-    v
-Sitekit application layer
-    |
-    +-- app
-    +-- router
-    +-- page
-    +-- render
-    +-- middleware
-    +-- config
-    +-- static / seo / errors
-    |
-    v
-Go standard library
-    |
-    +-- net/http
-    +-- html/template
-    +-- context
-    +-- io/fs
-    +-- log/slog
-    +-- encoding/json
+Application
+     |
+     v
+Sitekit Application Layer
+     |
+     +-- app
+     +-- router
+     +-- page
+     +-- render
+     +-- supporting packages
+     |
+     v
+Go Standard Library
+     |
+     +-- net/http
+     +-- html/template
+     +-- context
+     +-- io/fs
+     +-- log/slog
+     +-- encoding/json
 ```
 
-Sitekit adds application structure around standard-library capabilities. It must not make the standard library inaccessible to the application.
+Sitekit adds structure and convenience around standard-library capabilities while preserving access to their underlying abstractions.
 
-## 2. Core architectural units
+## 2. Architectural Components
 
-### `app`
+### Core
 
-`app` owns the application runtime boundary.
+Core packages define the fundamental programming model of Sitekit.
 
-Its responsibilities include:
+**`app`**
 
-- application configuration;
-- the underlying `http.ServeMux`;
-- request-context creation;
-- conversion between Sitekit handlers and `http.Handler`;
-- application middleware;
-- error handling;
-- server startup and graceful shutdown.
+Owns the application runtime and composition boundary. It coordinates configuration, request handling, HTTP middleware, handler integration, error handling, and server lifecycle.
 
-`App` is the composition root. It should not become a container for unrelated application features.
+The application object must remain focused on runtime responsibilities rather than becoming a container for unrelated features.
 
-### `router`
+**`router`**
 
-`router` provides a higher-level registration API over `http.ServeMux`.
+Provides route registration and grouping over `http.ServeMux`.
 
-The router is an adapter, not an independent HTTP server. Route matching ultimately belongs to the standard library. Grouping and handler middleware are composition conveniences around that primitive.
+It is an adapter, not an independent routing engine. Route matching remains the responsibility of the standard library.
 
-### `page`
+**`page`**
 
-`page` defines the application-facing representation of a renderable page.
+Defines the application-facing representation of a renderable page, including its template identity, layout, metadata, and application-owned data.
 
-A page carries the template identity, optional layout, metadata, and data supplied to the renderer. Generic typed pages provide compile-time structure for application data without introducing a custom template language.
+Typed page implementations provide compile-time structure without introducing a custom template language.
 
-### `render`
+**`render`**
 
-`render` owns server-side HTML rendering.
+Owns server-side HTML rendering using `html/template` and `io/fs`.
 
-The renderer uses `html/template` and `io/fs` rather than defining a Sitekit template engine. Template functions, layouts, caching, and development reload behavior are renderer concerns.
+Template loading, execution, layouts, function registration, and caching belong to this component. Rendering must remain independent of routing concerns.
 
-### `middleware`
+### Supporting Packages
 
-Middleware is split conceptually into two layers:
+Supporting packages provide additional application-level functionality without defining the core programming model.
 
-1. HTTP middleware compatible with `func(http.Handler) http.Handler`;
-2. handler middleware compatible with Sitekit's `HandlerFunc` abstraction.
+These include:
 
-These layers must remain explicit. The framework should not hide the transition between them when doing so would reduce control or make execution order unclear.
+- `config` — application configuration;
+- `errors` — structured HTTP errors;
+- `middleware` — reusable middleware;
+- `static` — static-file utilities;
+- `seo` — metadata and SEO helpers.
 
-### supporting packages
+Supporting packages must remain focused and must not introduce unnecessary dependencies into the core.
 
-`config`, `errors`, `static`, `seo`, and development tooling provide focused application-level capabilities. They should remain independently understandable and should not become prerequisites for the core request path unless a documented contract requires it.
+### Tooling
 
-## 3. Request lifecycle
+Development tools, including the CLI and live reload, support development workflows rather than production runtime requirements.
 
-The normal request path is:
+They may evolve independently of the core architecture.
+
+## 3. Request Lifecycle
+
+The normal request flow is:
 
 ```text
-HTTP request
-    |
-    v
+Incoming HTTP Request
+        |
+        v
 http.Server
-    |
-    v
-App HTTP middleware
-    |
-    v
+        |
+        v
+Application HTTP Middleware
+        |
+        v
 http.ServeMux
-    |
-    v
-route + handler middleware
-    |
-    v
-Sitekit Context
-    |
-    v
-application HandlerFunc
-    |
-    +----> JSON response
-    |
-    +----> redirect
-    |
-    +----> page.Page -> Renderer -> html/template
-    |
-    +----> error -> ErrorHandler
-    v
-HTTP response
+        |
+        v
+Route and Handler Middleware
+        |
+        v
+Sitekit Handler
+        |
+        v
+     Context
+    |       |
+    v       v
+ Request  Response
+             |
+             v
+     http.ResponseWriter
 ```
 
-The important property is that Sitekit does not replace the HTTP lifecycle. It adds a small framework lifecycle inside it.
+Sitekit introduces an application-level lifecycle inside the standard HTTP lifecycle. It does not replace the underlying request and response model.
 
-## 4. Context boundary
+For each incoming request, Sitekit creates a request-scoped `Response` wrapper around the underlying `http.ResponseWriter`. The handler accesses this wrapper through `Context.Writer`, while the original request is available through `Context.Request`.
 
-`app.Context` is an application convenience around `http.ResponseWriter` and `*http.Request`.
+The `Response` wrapper tracks response commitment and write operations while delegating actual HTTP response operations to the underlying `http.ResponseWriter`.
 
-The underlying request remains available. `Context.Context()` returns the request's standard `context.Context`, request parameters come from `Request.PathValue`, and query access is based on `Request.URL.Query()`.
+Calling `Response.Unwrap()` exposes the underlying writer directly. Writes through the unwrapped writer bypass the tracking guarantees provided by the wrapper.
+## 4. Context and HTTP Boundaries
 
-This boundary must remain transparent enough that an application can drop down to `net/http` whenever necessary.
+`app.Context` provides request-scoped access to the HTTP request, Sitekit response boundary, and application-level request helpers.
 
-## 5. Rendering boundary
+It exposes three distinct boundaries:
+- `Context.Request` provides access to the underlying `*http.Request`.
+- `Context.Writer` provides access to Sitekit's `*app.Response` abstraction.
+- `Context.Writer.Unwrap()` provides an escape hatch to the underlying `http.ResponseWriter`.
+  The Response abstraction tracks response status, bytes written, and commitment state while preserving the standard `http.ResponseWriter` model.
 
-Rendering is deliberately separated from routing and request handling:
+Applications may use the underlying standard-library response writer when necessary, but direct writes through the unwrapped writer bypass Sitekit's response tracking and must be treated as an explicit escape hatch.
+
+## 5. Rendering and Error Boundaries
+
+Rendering is separated from request routing and application handler logic.
+
+A handler determines which page should be rendered. The page carries template identity and application data. The renderer converts that page into HTML.
+
+The renderer uses standard Go template primitives and does not own application routing or business logic.
+
+Handler errors are delegated to the application error boundary. This provides one explicit integration point for translating application errors into HTTP responses.
+
+The exact response and error-handling guarantees belong in `contracts.md`.
+
+## 6. Middleware Composition
+
+Sitekit supports two distinct middleware layers:
+
+1. HTTP middleware operating on `http.Handler`;
+2. Handler middleware operating on Sitekit handler functions.
+
+HTTP middleware wraps the application HTTP handler. Handler middleware composes around individual route handlers.
+
+Middleware composition is explicit and order-sensitive. Route groups may inherit parent middleware and extend it with additional middleware.
+
+The exact ordering and inheritance rules are defined in `contracts.md`.
+
+## 7. Dependency Direction
+
+Dependencies should follow a clear direction:
 
 ```text
-HandlerFunc
-   |
-   v
-page.Page
-   |
-   v
-Renderer
-   |
-   v
-html/template + io/fs
+app         -> config, render, livereload
+router      -> app
+render      -> page
+middleware  -> config
+static      -> config
+seo         -> config, page
+errors      -> app, page
+livereload  -> config
+page        -> standard library
 ```
 
-A handler decides *what* page to render. The renderer decides *how* that page becomes HTML. The page abstraction carries the data and template identity between the two.
+Arrows represent Go package import dependencies. An arrow from package A to package B means that package A imports package B.
 
-The renderer writes the HTTP status and content type as part of rendering. Therefore rendering is an HTTP response operation, not a pure string-generation utility.
+Applications depend on Sitekit's public packages, while Sitekit packages depend on the standard library and, where necessary, on other Sitekit packages. The dependency graph must remain acyclic.
 
-## 6. Error boundary
+The architecture must avoid circular dependencies and unnecessary coupling.
 
-Handlers return `error` instead of writing framework-specific error responses directly.
-
-The application converts a handler error into an HTTP response through `ErrorHandler`. A default handler exists when the application does not configure one.
-
-This establishes one important invariant:
-
-> Returning an error from a Sitekit handler transfers error-response responsibility to the application error boundary.
-
-Applications that need lower-level control can use `http.Handler` directly or write to the response themselves.
-
-## 7. Middleware composition
-
-Middleware order is part of behavior and therefore part of the architectural contract.
-
-For a sequence `A, B, C`, wrapping is performed from the end of the list so that execution is:
-
-```text
-A -> B -> C -> handler
-```
-
-and unwinding follows the reverse order.
-
-Route groups inherit parent handler middleware and append child middleware. Application-level HTTP middleware wraps the final mux handler.
-
-Future changes must preserve this model unless an explicit compatibility decision says otherwise.
-
-## 8. Dependency direction
-
-The preferred dependency direction is toward lower-level primitives:
-
-```text
-app -> config / render / livereload
-router -> app
-render -> page
-page -> standard library types only
-middleware -> app
-application -> any public Sitekit package
-```
-
-The core must avoid circular conceptual dependencies. In particular:
+In particular:
 
 - `page` must not depend on `app`;
-- `render` must not own routing concerns;
+- `render` must not own routing;
 - `router` must not become a rendering layer;
-- supporting packages must not silently become global application state.
+- supporting packages must not introduce implicit global application state.
 
-## 9. Composition over centralization
+## 8. Composition and Extensibility
 
-Sitekit should expose small composable units rather than a single global framework object containing every capability.
+Sitekit favors small, composable components over a centralized framework object.
 
-The intended composition model is:
+Applications should be able to configure, replace, or bypass individual components where appropriate.
 
-```go
-cfg := config.Load()
-app := app.New(cfg)
-r := router.New(app)
-renderer := render.New(templateFS, cfg.IsDevelopment())
+Major abstractions must preserve standard-library escape hatches:
 
-app = app.WithRenderer(renderer)
+- HTTP handlers remain compatible with `net/http`;
+- applications retain access to the underlying request and response writer;
+- routing is based on `http.ServeMux`;
+- templates use `html/template`;
+- template files are provided through `io/fs`.
 
-r.Get("/", handler)
-```
+Convenience must not remove control over the underlying Go primitives.
 
-The exact API may evolve; the architectural property must not: components should be replaceable and independently understandable.
+## 9. Development and Production Separation
 
-## 10. Standard-library escape hatches
+Development-only functionality, such as live reload, must remain independent of production runtime requirements.
 
-Every major abstraction must have an obvious path back to the standard library.
+Development mode may introduce additional middleware, endpoints, or background processes. Production behavior must not depend on these features.
 
-Examples include:
+Development tooling is not part of the core runtime merely because it is automatically enabled in development mode.
 
-- `App.Mux` exposes the underlying `*http.ServeMux`;
-- handlers receive the underlying `*http.Request` and `http.ResponseWriter` through `Context`;
-- middleware can be written directly as `func(http.Handler) http.Handler`;
-- templates are standard `html/template` templates;
-- template files are supplied through `io/fs`.
+## 10. Architectural Invariants
 
-An abstraction that prevents this escape path is architecturally suspect.
-
-## 11. Development-only behavior
-
-Development conveniences, such as live reload, must remain orthogonal to production request semantics.
-
-Development mode may add watchers, endpoints, or middleware, but the production architecture must not depend on them. A feature is not considered core merely because it is enabled automatically during development.
-
-## 12. Architectural invariants
-
-The following invariants are normative:
+The following rules define the intended architecture:
 
 1. `net/http` remains the underlying HTTP model.
-2. Routing remains based on `http.ServeMux` rather than a separate routing engine.
-3. Server-side HTML rendering remains based on `html/template`.
-4. Page data is application-owned; Sitekit does not introduce a global model container.
-5. Middleware composition is explicit and order-sensitive.
-6. Handler errors cross one explicit application error boundary.
-7. Public abstractions retain an escape hatch to lower-level Go primitives.
-8. Supporting features must not force unrelated dependencies into the core.
+2. Routing remains based on `http.ServeMux`.
+3. Server-side rendering remains based on `html/template`.
+4. Page data remains application-owned.
+5. Middleware composition remains explicit and order-sensitive.
+6. Handler errors pass through one explicit application error boundary.
+7. Public abstractions preserve access to lower-level Go primitives.
+8. Supporting functionality must not impose unrelated dependencies on the core.
+9. Development tooling must remain independent of production requirements.
 
-These invariants are the architectural consequences of the principles documented in `design-principles.md`. Public API details and their compatibility status belong in `contracts.md` and the API lifecycle registry.
+These invariants follow from the principles in `design-principles.md`.
+
+Public API guarantees are defined in `contracts.md`. API lifecycle and compatibility commitments are tracked in `api-lifecycle.md` and `compatibility.md`.

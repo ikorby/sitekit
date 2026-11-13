@@ -26,12 +26,12 @@ Building traditional web applications in Go often means assembling the same piec
 
 **1. Install the Sitekit CLI:**
 ```bash
-go install [github.com/ikorby/sitekit/cmd/sk@latest](https://github.com/ikorby/sitekit/cmd/sk@latest)
+go install github.com/ikorby/sitekit/cmd/sk@latest
 ```
 
 **2. Or install the framework directly into an existing project:**
 ```bash
-go get [github.com/ikorby/sitekit](https://github.com/ikorby/sitekit)
+go get github.com/ikorby/sitekit
 ```
 
 ---
